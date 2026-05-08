@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx next *)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -H \"api-key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIiwic3ViamVjdCI6ImFwaS1rZXk6ZmY2OWYwYjItNTFkNS00NWJhLThmMmUtZTc4MzVhN2MxMjUzIn0.VkJ3h78XJMC3mfrwedl7NrtVX2qV0jIBVt4Po-L-mhA\" \"https://0e3e10a5-1d1f-4364-b24e-10b3f680a6aa.eu-west-2-0.aws.cloud.qdrant.io/collections\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3001/)",
+      "Skill(browse)",
+      "Skill(browse:*)"
+    ]
+  }
+}
