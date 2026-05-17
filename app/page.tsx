@@ -7,9 +7,29 @@ type Source = {
   snippet: string;
 };
 
+type WebSource = {
+  title: string;
+  url: string;
+  snippet: string;
+};
+
+type CragMeta = {
+  action: "CORRECT" | "AMBIGUOUS" | "INCORRECT";
+  retrieved: number;
+  kept: number;
+  webQuery: string | null;
+  webUsed: boolean;
+};
+
 type Message =
   | { role: "user"; content: string }
-  | { role: "assistant"; content: string; sources?: Source[] };
+  | {
+      role: "assistant";
+      content: string;
+      sources?: Source[];
+      webSources?: WebSource[];
+      crag?: CragMeta;
+    };
 
 export default function Home() {
   const [docId, setDocId] = useState<string | null>(null);
@@ -68,7 +88,13 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "Request failed");
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: data.answer, sources: data.sources },
+        {
+          role: "assistant",
+          content: data.answer,
+          sources: data.sources,
+          webSources: data.webSources,
+          crag: data.crag,
+        },
       ]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Request failed";
@@ -128,15 +154,41 @@ export default function Home() {
             {messages.map((m, i) => (
               <div key={i} className={`msg ${m.role}`}>
                 <div>{m.content}</div>
+                {m.role === "assistant" && m.crag && (
+                  <div className={`crag-badge crag-${m.crag.action.toLowerCase()}`}>
+                    CRAG: {m.crag.action} · kept {m.crag.kept}/{m.crag.retrieved}
+                    {m.crag.webUsed && " · web ✓"}
+                    {m.crag.webQuery && (
+                      <span className="crag-query"> · q: “{m.crag.webQuery}”</span>
+                    )}
+                  </div>
+                )}
                 {m.role === "assistant" && m.sources && m.sources.length > 0 && (
                   <div className="sources">
                     <details>
-                      <summary>Sources ({m.sources.length})</summary>
+                      <summary>Document sources ({m.sources.length})</summary>
                       {m.sources.map((s, j) => (
                         <div key={j} className="source-item">
                           {s.pageNumber !== null && (
                             <div className="pg">Page {s.pageNumber}</div>
                           )}
+                          <div>{s.snippet}…</div>
+                        </div>
+                      ))}
+                    </details>
+                  </div>
+                )}
+                {m.role === "assistant" && m.webSources && m.webSources.length > 0 && (
+                  <div className="sources">
+                    <details>
+                      <summary>Web sources ({m.webSources.length})</summary>
+                      {m.webSources.map((s, j) => (
+                        <div key={j} className="source-item">
+                          <div className="pg">
+                            <a href={s.url} target="_blank" rel="noreferrer">
+                              {s.title || s.url}
+                            </a>
+                          </div>
                           <div>{s.snippet}…</div>
                         </div>
                       ))}

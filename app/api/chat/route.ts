@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { CHAT_MODEL, getEmbeddings, getQdrantConfig } from "@/lib/rag";
+import {
+  decideAction,
+  gradeDocuments,
+  rewriteQueryForWeb,
+  webSearch,
+  type WebResult,
+} from "@/lib/crag";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -34,7 +41,7 @@ export async function POST(req: NextRequest) {
     const retriever = store.asRetriever({ k: 4 });
     const docs = await retriever.invoke(question);
 
-    const context: RetrievedChunk[] = docs.map((d, i) => ({
+    const retrieved: RetrievedChunk[] = docs.map((d, i) => ({
       index: i + 1,
       pageNumber:
         (d.metadata?.loc as { pageNumber?: number } | undefined)?.pageNumber ??
@@ -43,16 +50,55 @@ export async function POST(req: NextRequest) {
       content: d.pageContent,
     }));
 
-    const systemPrompt = `You are an AI assistant that answers user questions based STRICTLY on the provided context from a single document.
+    const graded = await gradeDocuments(question, retrieved);
+    const action = decideAction(graded);
+
+    const keptChunks = graded.filter((g) => g.relevant);
+    let webResults: WebResult[] = [];
+    let webQuery: string | null = null;
+
+    if (action !== "CORRECT") {
+      webQuery = await rewriteQueryForWeb(question);
+      webResults = await webSearch(webQuery);
+    }
+
+    const docContextJson = JSON.stringify(
+      keptChunks.map(({ index, pageNumber, content }) => ({
+        index,
+        pageNumber,
+        content,
+      })),
+      null,
+      2,
+    );
+
+    const webContextJson = JSON.stringify(
+      webResults.map((r, i) => ({
+        index: i + 1,
+        url: r.url,
+        title: r.title,
+        content: r.content,
+      })),
+      null,
+      2,
+    );
+
+    const hasDocs = keptChunks.length > 0;
+    const hasWeb = webResults.length > 0;
+
+    const systemPrompt = `You are a Corrective RAG assistant. Answer the user's question using the sources below.
 
 Rules:
-- Answer ONLY using the provided context. Do NOT use outside knowledge.
-- If the answer is not in the context, reply: "I couldn't find this in the document."
-- When you use information from a chunk that has a pageNumber, cite it like "(page 3)".
-- Be concise and direct.
+- Prefer information from the document context when available; use web context to fill gaps or correct it.
+- When citing the document, format as "(page N)". When citing the web, format as "(web: <domain>)".
+- If neither source contains the answer, reply: "I couldn't find a reliable answer."
+- Be concise and direct. Do not invent citations.
 
-Context (JSON array of chunks):
-${JSON.stringify(context, null, 2)}`;
+Document context (JSON, may be empty):
+${hasDocs ? docContextJson : "[]"}
+
+Web context (JSON, may be empty):
+${hasWeb ? webContextJson : "[]"}`;
 
     const llm = new ChatGoogleGenerativeAI({
       model: CHAT_MODEL,
@@ -72,9 +118,21 @@ ${JSON.stringify(context, null, 2)}`;
 
     return NextResponse.json({
       answer,
-      sources: context.map((c) => ({
+      crag: {
+        action,
+        retrieved: graded.length,
+        kept: keptChunks.length,
+        webQuery,
+        webUsed: hasWeb,
+      },
+      sources: keptChunks.map((c) => ({
         pageNumber: c.pageNumber,
         snippet: c.content.slice(0, 240),
+      })),
+      webSources: webResults.map((r) => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.content.slice(0, 240),
       })),
     });
   } catch (err) {

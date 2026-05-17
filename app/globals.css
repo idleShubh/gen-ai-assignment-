@@ -221,3 +221,45 @@ textarea:focus {
   font-size: 13px;
   font-style: italic;
 }
+
+.crag-badge {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.crag-correct {
+  border-color: #2f6f4a;
+  color: #6fd49a;
+}
+
+.crag-ambiguous {
+  border-color: #7a6024;
+  color: #e6c266;
+}
+
+.crag-incorrect {
+  border-color: #8a3a3a;
+  color: #ff9a9a;
+}
+
+.crag-query {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.source-item .pg a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.source-item .pg a:hover {
+  text-decoration: underline;
+}
